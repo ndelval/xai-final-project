@@ -1,0 +1,16 @@
+# Private working files (not part of the deliverable)
+wiki/
+markdown/
+_2026__XAI__Final_Project.pdf
+.claude/
+CLAUDE.md
+
+# Environment and generated data
+.venv/
+data/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+.env
+.DS_Store
