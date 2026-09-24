@@ -1,0 +1,20 @@
+/* Print style for report.md -> HTML -> PDF (A4). Kept small on purpose. */
+@page { size: A4; margin: 2cm 2.1cm; }
+html { font-family: "Palatino", "Georgia", serif; font-size: 10pt; line-height: 1.38; color: #111; }
+body { max-width: none; margin: 0; padding: 0; }
+header { text-align: center; margin-bottom: 1.2em; }
+h1.title { font-size: 1.7em; margin: 0 0 .1em; }
+p.subtitle, p.author { margin: .1em 0; color: #444; }
+h1 { font-size: 1.3em; margin: 1.3em 0 .4em; }
+h2 { font-size: 1.08em; margin: 1.1em 0 .3em; }
+p { margin: .5em 0; text-align: justify; hyphens: auto; }
+table { border-collapse: collapse; width: 100%; margin: .7em 0 .3em; font-size: .88em; }
+th, td { padding: .25em .5em; text-align: right; border-bottom: 1px solid #ddd; }
+th:first-child, td:first-child { text-align: left; }
+thead th { border-bottom: 1.5px solid #111; border-top: 1.5px solid #111; }
+table caption { caption-side: bottom; text-align: left; font-size: .92em; color: #333; padding-top: .3em; }
+figure { margin: .8em 0; text-align: center; break-inside: avoid; }
+figcaption { font-size: .92em; color: #333; text-align: left; }
+img { max-width: 100%; }
+ol { font-size: .9em; padding-left: 1.4em; }
+code { font-size: .9em; }

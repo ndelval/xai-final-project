@@ -7,7 +7,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 from xgboost import XGBClassifier
 
-from src.modeling import build_pipeline, cv_and_gap, make_models, split
+from src.modeling import (build_pipeline, churn_metrics, customer_costs, cv_and_gap, expected_cost,
+                          make_models, oof_proba, pick_threshold, split)
 
 CONTRACTS = ("monthly", "yearly", "biennial")
 
@@ -100,3 +101,82 @@ def test_cv_and_gap_depends_on_the_seed_and_only_on_it():
 
     assert run(1) == run(1)
     assert run(1)["cv_auc"] != run(2)["cv_auc"]
+
+
+# --- Decision threshold and churn-class metrics -------------------------------------------------
+# Six customers, two of them churners. At threshold 0.5 the model gets one churner right (TP), misses
+# the other (FN) and wrongly flags two loyal customers (FP); two loyal customers are cleared (TN).
+# The counts are all different on purpose, so precision, recall and F1 take three different values
+# and swapping any two of them would be noticed.
+Y = np.array([0, 0, 0, 0, 1, 1])
+P = np.array([0.1, 0.2, 0.6, 0.7, 0.8, 0.4])
+
+
+def test_churn_metrics_are_for_the_churn_class_not_weighted():
+    m = churn_metrics(Y, P, threshold=0.5)
+
+    assert m["precision"] == pytest.approx(1 / 3)
+    assert m["recall"] == pytest.approx(1 / 2)
+    assert m["f1"] == pytest.approx(0.4)  # a weighted F1 would be 0.514 and hide the churners
+    assert m["accuracy"] == pytest.approx(3 / 6)
+
+
+def test_a_model_that_never_flags_churn_scores_zero_recall_despite_high_accuracy():
+    m = churn_metrics(Y, np.zeros(6), threshold=0.5)
+
+    assert m["recall"] == 0 and m["precision"] == 0 and m["f1"] == 0
+    assert m["accuracy"] == pytest.approx(4 / 6)
+
+
+def test_expected_cost_counts_missed_churners_and_wasted_offers():
+    # 2 churners missed and 1 loyal customer flagged. The counts differ on purpose: with equal
+    # counts, swapping which error carries the ratio would give the same number.
+    pred = np.array([0, 0, 0, 1, 0, 0])
+    assert list(customer_costs(Y, pred, cost_ratio=5)) == [0, 0, 0, 1, 5, 5]
+    assert expected_cost(Y, pred, cost_ratio=5) == pytest.approx((5 * 2 + 1 * 1) / 6)
+    assert expected_cost(Y, pred, cost_ratio=1) == pytest.approx(3 / 6)
+
+
+def test_threshold_falls_as_a_missed_churner_gets_more_expensive():
+    # Perfectly calibrated probabilities: the cost-optimal threshold is 1 / (1 + cost_ratio).
+    rng = np.random.default_rng(0)
+    p = rng.random(50_000)
+    y = (rng.random(50_000) < p).astype(int)
+
+    thresholds = {r: pick_threshold(y, p, cost_ratio=r) for r in (1, 2, 5, 10)}
+
+    assert thresholds[10] < thresholds[5] < thresholds[2] < thresholds[1]
+    for ratio, t in thresholds.items():
+        assert t == pytest.approx(1 / (1 + ratio), abs=0.03)
+
+
+def test_threshold_ties_go_to_the_lowest_value():
+    # Every customer churns: any threshold up to 0.3 flags all of them at zero cost. Take the first.
+    assert pick_threshold(np.array([1, 1, 1]), np.array([0.3, 0.5, 0.7]), cost_ratio=5) == pytest.approx(0.01)
+
+
+def test_oof_predictions_come_from_models_that_never_saw_the_row():
+    # Labels are pure noise but every row has a unique numeric fingerprint, so a flexible model
+    # memorises (most of) the labels of the rows it was fitted on. Out-of-fold predictions cannot.
+    # Memorisation is partial because XGBoost bins each feature into 256 values.
+    rng = np.random.default_rng(0)
+    X = pd.DataFrame({"fingerprint": rng.permutation(400).astype(float), "contract": "monthly"})
+    y = pd.Series(rng.integers(0, 2, 400))
+    estimator = build_pipeline(XGBClassifier(n_estimators=300, max_depth=6, random_state=0))
+
+    oof = oof_proba(estimator, X, y)
+    in_sample = clone(estimator).fit(X, y).predict_proba(X)[:, 1]
+
+    assert oof.shape == (400,) and ((0 <= oof) & (oof <= 1)).all()
+    assert roc_auc_score(y, in_sample) > 0.85          # the model can memorise...
+    assert abs(roc_auc_score(y, oof) - 0.5) < 0.1      # ...but not out of fold
+
+
+def test_oof_predictions_are_in_row_order_and_work_with_a_grid_search():
+    # Real signal this time: if the rows came back shuffled, the AUC against y would collapse.
+    X_train, y_train, _, _ = make_data()
+
+    oof = oof_proba(make_models()["logistic"], X_train, y_train)
+
+    assert oof.shape == (len(y_train),)
+    assert roc_auc_score(y_train, oof) > 0.75

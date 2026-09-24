@@ -1,10 +1,13 @@
 """Split, pipeline and evaluation protocol shared by every experiment."""
+import numpy as np
 from sklearn.base import clone
 from sklearn.compose import ColumnTransformer, make_column_selector
 from sklearn.dummy import DummyClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import average_precision_score, roc_auc_score
-from sklearn.model_selection import GridSearchCV, StratifiedKFold, cross_validate, train_test_split
+from sklearn.metrics import (accuracy_score, average_precision_score, brier_score_loss, f1_score,
+                             precision_score, recall_score, roc_auc_score)
+from sklearn.model_selection import (GridSearchCV, StratifiedKFold, cross_val_predict, cross_validate,
+                                     train_test_split)
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from xgboost import XGBClassifier
@@ -77,3 +80,49 @@ def cv_and_gap(estimator, X_train, y_train, X_test, y_test, seed=SEED):
     return {"train_auc": train_auc, "cv_auc": cv_auc, "cv_std": cv["test_auc"].std(),
             "test_auc": roc_auc_score(y_test, proba), "gap": train_auc - cv_auc,
             "cv_pr_auc": cv["test_pr_auc"].mean(), "test_pr_auc": average_precision_score(y_test, proba)}
+
+
+def oof_proba(estimator, X_train, y_train, seed=SEED):
+    """Churn probability of every training row, from models that never saw that row (5-fold CV).
+
+    This is what the decision threshold is chosen on: the test set is not touched, and the
+    probabilities are not the over-confident ones a model gives to rows it was fitted on.
+    """
+    cv = StratifiedKFold(5, shuffle=True, random_state=seed)
+    return cross_val_predict(estimator, X_train, y_train, cv=cv, method="predict_proba")[:, 1]
+
+
+def churn_metrics(y_true, proba, threshold):
+    """Metrics of the churn class at a threshold, plus PR-AUC and Brier score (threshold-free).
+
+    Always the churn class, never a weighted average: with 26.5 % churn a weighted score is
+    dominated by the loyal customers and hides how well the churners are found.
+    """
+    pred = np.asarray(proba) >= threshold
+    return {"precision": precision_score(y_true, pred, zero_division=0),
+            "recall": recall_score(y_true, pred),
+            "f1": f1_score(y_true, pred, zero_division=0),
+            "accuracy": accuracy_score(y_true, pred),
+            "pr_auc": average_precision_score(y_true, proba),
+            "brier": brier_score_loss(y_true, proba)}
+
+
+def customer_costs(y_true, pred, cost_ratio):
+    """Cost of each customer's decision: a missed churner costs `cost_ratio`, a wasted offer costs 1.
+
+    `y_true` and `pred` (True = contact the customer) are matched by position, not by index.
+    """
+    y_true, pred = np.asarray(y_true), np.asarray(pred).astype(bool)
+    return np.where(y_true == 1, cost_ratio * ~pred, pred)
+
+
+def expected_cost(y_true, pred, cost_ratio):
+    """Average cost per customer."""
+    return customer_costs(y_true, pred, cost_ratio).mean()
+
+
+def pick_threshold(y_true, proba, cost_ratio):
+    """The threshold in [0.01, 0.99] with the lowest expected cost on the given probabilities."""
+    grid = np.linspace(0.01, 0.99, 99)
+    costs = [expected_cost(y_true, proba >= t, cost_ratio) for t in grid]
+    return grid[int(np.argmin(costs))]
