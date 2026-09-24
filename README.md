@@ -22,14 +22,19 @@ On macOS, XGBoost needs a recent `libomp`; if `import xgboost` fails, run `brew 
 
 ```bash
 .venv/bin/python -m src.data     # download the dataset to data/raw/ and print a summary
-.venv/bin/python -m pytest       # run the tests
+.venv/bin/python -m pytest       # run the tests (~10 s)
+
+# Data, models and evaluation (~2 min). Writes reports/metrics.json.
+.venv/bin/python -m jupyter nbconvert --to notebook --execute --inplace notebooks/01_model.ipynb
 ```
 
 ## Layout
 
 ```
-src/         data loading and cleaning (more modules are added as the project grows)
+src/         data loading and cleaning (data.py), split, pipeline and evaluation protocol (modeling.py)
+notebooks/   01_model.ipynb: task, data, protocol, baselines and results
 tests/       pytest tests
+reports/     metrics.json written by the notebooks
 data/        raw data, downloaded by `python -m src.data` (not versioned)
 ```
 

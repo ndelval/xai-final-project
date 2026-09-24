@@ -1,0 +1,32 @@
+{
+  "seed": 42,
+  "auc": {
+    "majority": {
+      "train_auc": 0.5,
+      "cv_auc": 0.5,
+      "cv_std": 0.0,
+      "test_auc": 0.5,
+      "gap": 0.0,
+      "cv_pr_auc": 0.2654,
+      "test_pr_auc": 0.2654
+    },
+    "logistic": {
+      "train_auc": 0.85,
+      "cv_auc": 0.8463,
+      "cv_std": 0.0129,
+      "test_auc": 0.8413,
+      "gap": 0.0037,
+      "cv_pr_auc": 0.6607,
+      "test_pr_auc": 0.6285
+    },
+    "xgboost": {
+      "train_auc": 0.859,
+      "cv_auc": 0.8508,
+      "cv_std": 0.0117,
+      "test_auc": 0.8481,
+      "gap": 0.0082,
+      "cv_pr_auc": 0.672,
+      "test_pr_auc": 0.6699
+    }
+  }
+}
