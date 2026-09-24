@@ -28,6 +28,7 @@ On macOS, XGBoost needs a recent `libomp`; if `import xgboost` fails, run `brew 
 # Each writes its figures to reports/figures/ and can also be opened in JupyterLab.
 .venv/bin/python -m jupyter nbconvert --to notebook --execute --inplace notebooks/01_model.ipynb    # data, models, threshold, calibration
 .venv/bin/python -m jupyter nbconvert --to notebook --execute --inplace notebooks/02_xai.ipynb      # explanations, sanity checks, local cases
+.venv/bin/python -m jupyter nbconvert --to notebook --execute --inplace notebooks/03_actions.ipynb  # model improvement, levers, counterfactuals
 
 reports/build_report.sh          # report.md -> report.pdf (needs pandoc and Google Chrome)
 ```
@@ -36,13 +37,29 @@ reports/build_report.sh          # report.md -> report.pdf (needs pandoc and Goo
 
 ```
 src/         data.py (load and clean) · modeling.py (split, pipeline, protocol, threshold and cost) ·
-             xai.py (SHAP and linear contributions per feature, sanity checks) · plots.py (figure style)
-notebooks/   01_model.ipynb · 02_xai.ipynb
+             xai.py (SHAP and linear contributions per feature, sanity checks, counterfactual search) · plots.py (figure style)
+notebooks/   01_model.ipynb · 02_xai.ipynb · 03_actions.ipynb
 tests/       pytest tests (each rule was broken on purpose to check that a test fails)
 reports/     report.md and build_report.sh (source of the PDF), figures/, metrics.json written by the notebooks
 data/        raw data, downloaded by `python -m src.data` (not versioned)
 ```
 
+## What the project does
+
+Binary classification of telecom churn. A logistic regression and an XGBoost model are trained with a protocol that
+avoids leakage (stratified split, nested cross-validation, threshold chosen on out-of-fold predictions, no resampling).
+The XGBoost model is explained with TreeSHAP, permutation importance and the coefficients of the linear model, the
+explanations are tested with two sanity checks (label randomisation, shuffling the top-ranked features), and they are
+used to simplify the model and to identify levers for the retention team, with counterfactuals from DiCE. Every number
+in the report comes from the notebooks (figures in `reports/figures/`, headline metrics in `reports/metrics.json`).
+
 ## Credits and external resources
 
-- Dataset: IBM sample data sets (link above).
+- **Data:** IBM sample data sets, "Telco Customer Churn" (link above).
+- **Libraries:** scikit-learn, XGBoost, SHAP (TreeSHAP), DiCE (`dice-ml`), pandas, NumPy, SciPy, matplotlib, pytest, JupyterLab.
+  Their public documentation was used for the APIs; no code was copied from tutorials or repositories.
+- **Methods, cited in the report:** SHAP (Lundberg and Lee, 2017; Lundberg et al., 2020), permutation importance (Fisher,
+  Rudin and Dominici, 2019), sanity checks for explanations (Adebayo et al., 2018, whose saliency-map tests for images are
+  adapted here to tabular SHAP), diverse counterfactual explanations (Mothilal, Sharma and Tan, 2020).
+- **Generative AI:** the project was developed with the help of a generative AI assistant (Claude Code), as the
+  assignment allows (section 8). The analysis, code and text are to be understood and defended by the author.

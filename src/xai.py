@@ -4,9 +4,12 @@ Both explainers work on the encoded matrix the model actually sees (one-hot colu
 feature such as Contract is spread over several columns. Contributions are additive, so we add the
 columns of each feature back together: that is what a person reads ("Contract", not "Contract_One year").
 """
+import itertools
+
 import numpy as np
 import pandas as pd
 import shap
+from scipy.special import expit, logit
 from sklearn.metrics import roc_auc_score
 
 from src.modeling import SEED
@@ -126,3 +129,41 @@ def median_case(proba, group):
     """
     positions = np.flatnonzero(group)
     return positions[np.argsort(np.asarray(proba)[positions])][len(positions) // 2]
+
+
+class ShiftedThreshold:
+    """Wraps a fitted model so that its decision boundary at `threshold` looks like 0.5, which is what DiCE assumes."""
+
+    def __init__(self, model, threshold):
+        self.model, self.shift = model, logit(threshold)
+
+    def predict_proba(self, X):
+        probability = np.clip(self.model.predict_proba(X)[:, 1], 1e-9, 1 - 1e-9)
+        shifted = expit(logit(probability) - self.shift)
+        return np.column_stack([1 - shifted, shifted])
+
+    def predict(self, X):
+        return (self.predict_proba(X)[:, 1] > 0.5).astype(int)
+
+
+def fewest_changes(model, row, options, threshold):
+    """The fewest changes to a customer that bring the predicted risk below `threshold`, trying every combination.
+
+    `row` is a one-row DataFrame (it keeps the column types); `options` maps each feature that may change to
+    the values it may take, which must include the current one. It counts changes, not their cost. Returns ({feature: (old, new)}, new probability), or None
+    if no combination gets below the threshold. Among combinations with as few changes, the lowest risk wins.
+    """
+    features, original = list(options), row.iloc[0]
+    for feature in features:
+        if original[feature] not in options[feature]:
+            raise ValueError(f"the current value of {feature} ({original[feature]!r}) must be one of its options")
+    candidates = pd.concat([row] * int(np.prod([len(v) for v in options.values()])), ignore_index=True)
+    candidates[features] = pd.DataFrame(list(itertools.product(*options.values())), columns=features)
+    probability = model.predict_proba(candidates)[:, 1]
+    n_changes = sum((candidates[f] != original[f]).to_numpy().astype(int) for f in features)
+    below = np.flatnonzero(probability < threshold)
+    if len(below) == 0:
+        return None
+    best = below[np.lexsort((probability[below], n_changes[below]))[0]]
+    changes = {f: (original[f], candidates.loc[best, f]) for f in features if candidates.loc[best, f] != original[f]}
+    return changes, float(probability[best])

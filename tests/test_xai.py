@@ -8,8 +8,8 @@ from xgboost import XGBClassifier
 
 from src.modeling import build_pipeline
 from src.xai import (MAX_RANDOMIZED_SPEARMAN, RANDOM_QUANTILE, auc_drop, bootstrap_rows, by_original_feature,
-                     importance_under_refits, linear_contributions, median_case, shap_by_feature,
-                     shuffle_labels, top_k_vs_random_k)
+                     ShiftedThreshold, fewest_changes, importance_under_refits, linear_contributions,
+                     median_case, shap_by_feature, shuffle_labels, top_k_vs_random_k)
 
 
 def make_data(n=600, seed=0):
@@ -171,3 +171,81 @@ def test_median_case_is_the_middle_customer_of_the_group_and_only_of_that_group(
 
     assert median_case(proba, group) == 5
     assert median_case(proba, ~group) == 4                       # the other group: 0.1, 0.3 -> upper median 0.3
+
+
+# --- Counterfactuals ------------------------------------------------------------------------------
+
+def make_lever_data(n=2000, seed=0):
+    """Risk = strong lever `plan` (3 levels) + weak lever `extra` (Yes/No) + noise. `age` cannot be changed."""
+    rng = np.random.default_rng(seed)
+    X = pd.DataFrame({"plan": rng.choice(["monthly", "yearly", "biennial"], n),
+                      "extra": rng.choice(["No", "Yes"], n), "age": rng.integers(18, 80, n).astype(float)})
+    logit_risk = 1.5 * (X["plan"] == "monthly") - 1.5 * (X["plan"] == "biennial") - 0.8 * (X["extra"] == "Yes") - 1.0
+    y = (rng.random(n) < expit(logit_risk)).astype(int)
+    return X, pd.Series(y)
+
+
+def test_the_fewest_changes_are_the_smallest_set_that_crosses_the_threshold():
+    X, y = make_lever_data()
+    model = build_pipeline(LogisticRegression(), scale=True).fit(X, y)
+    row = pd.DataFrame({"plan": ["monthly"], "extra": ["No"], "age": [40.0]})   # one row keeps the column types
+    threshold = 0.25
+    assert model.predict_proba(row)[:, 1][0] > threshold                        # this customer is flagged
+
+    everything = {"plan": ["monthly", "yearly", "biennial"], "extra": ["No", "Yes"]}
+    changes, probability = fewest_changes(model, row, everything, threshold)
+    assert probability < threshold
+    assert len(changes) == 1 and "plan" in changes                          # one change is enough: the plan
+
+    # Same customer, but the plan cannot change: the weak lever is not enough, so nothing works ...
+    assert fewest_changes(model, row, {"plan": ["monthly"], "extra": ["No", "Yes"]}, threshold) is None
+    # ... and if the threshold is high enough, the weak lever alone is the cheapest way.
+    high = model.predict_proba(row)[:, 1][0] - 0.001
+    changes, _ = fewest_changes(model, row, {"plan": ["monthly"], "extra": ["No", "Yes"]}, high)
+    assert list(changes) == ["extra"]
+
+
+def test_among_equally_small_sets_of_changes_the_lowest_risk_wins():
+    X, y = make_lever_data()
+    model = build_pipeline(LogisticRegression(), scale=True).fit(X, y)
+    row = pd.DataFrame({"plan": ["monthly"], "extra": ["No"], "age": [40.0]})
+    probability = {plan: model.predict_proba(row.assign(plan=plan))[:, 1][0] for plan in ("monthly", "yearly", "biennial")}
+    assert probability["biennial"] < probability["yearly"] < probability["monthly"]
+    threshold = (probability["yearly"] + probability["monthly"]) / 2        # both a yearly and a biennial plan cross it
+
+    changes, after = fewest_changes(model, row, {"plan": ["monthly", "yearly", "biennial"]}, threshold)
+
+    assert changes == {"plan": ("monthly", "biennial")} and after == pytest.approx(probability["biennial"])
+
+
+def test_a_customer_already_below_the_threshold_needs_no_change():
+    X, y = make_lever_data()
+    model = build_pipeline(LogisticRegression(), scale=True).fit(X, y)
+    row = pd.DataFrame({"plan": ["biennial"], "extra": ["Yes"], "age": [40.0]})
+
+    changes, probability = fewest_changes(model, row, {"plan": ["monthly", "biennial"], "extra": ["No", "Yes"]}, 0.5)
+
+    assert changes == {} and probability < 0.5
+
+
+def test_the_current_value_of_a_feature_must_be_one_of_its_options():
+    X, y = make_lever_data()
+    model = build_pipeline(LogisticRegression(), scale=True).fit(X, y)
+    row = pd.DataFrame({"plan": ["monthly"], "extra": ["No"], "age": [40.0]})
+
+    with pytest.raises(ValueError, match="plan"):
+        fewest_changes(model, row, {"plan": ["yearly", "biennial"]}, 0.5)   # "monthly" is not allowed: no 0-change candidate
+
+
+def test_shifted_threshold_moves_the_decision_boundary_to_one_half():
+    X, y = make_lever_data()
+    model = build_pipeline(LogisticRegression(), scale=True).fit(X, y)
+    threshold = 0.2
+    wrapped = ShiftedThreshold(model, threshold)
+
+    shifted = wrapped.predict_proba(X)[:, 1]
+
+    original = model.predict_proba(X)[:, 1]
+    assert ((shifted > 0.5) == (original > threshold)).all()
+    assert ((wrapped.predict(X) == 1) == (original > threshold)).all()
+    assert wrapped.predict_proba(X).sum(axis=1) == pytest.approx(1.0)

@@ -1,5 +1,5 @@
 /* Print style for report.md -> HTML -> PDF (A4). Kept small on purpose. */
-@page { size: A4; margin: 2cm 2.1cm; }
+@page { size: A4; margin: 1.8cm 2cm; }
 html { font-family: "Palatino", "Georgia", serif; font-size: 10pt; line-height: 1.38; color: #111; }
 body { max-width: none; margin: 0; padding: 0; }
 header { text-align: center; margin-bottom: 1.2em; }

@@ -5,9 +5,10 @@ import pytest
 from sklearn.base import clone
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
+from sklearn.model_selection import StratifiedKFold, cross_val_score
 from xgboost import XGBClassifier
 
-from src.modeling import (build_pipeline, churn_metrics, customer_costs, cv_and_gap, cv_fold_scores,
+from src.modeling import (SEED, build_pipeline, churn_metrics, customer_costs, cv_and_gap, cv_fold_scores,
                           expected_cost, make_models, oof_proba, pick_threshold, split)
 
 CONTRACTS = ("monthly", "yearly", "biennial")
@@ -185,7 +186,7 @@ def test_oof_predictions_are_in_row_order_and_work_with_a_grid_search():
 # --- Per-fold scores for comparing variants of the model ---------------------------------------
 
 def test_fold_scores_use_the_given_threshold_and_the_same_folds_every_time():
-    X_train, y_train, _, _ = make_data()
+    X_train, y_train, X_test, y_test = make_data()
     estimator = build_pipeline(LogisticRegression(), scale=True)
 
     everybody = cv_fold_scores(estimator, X_train, y_train, threshold=0.0, cost_ratio=5)
@@ -194,8 +195,26 @@ def test_fold_scores_use_the_given_threshold_and_the_same_folds_every_time():
     assert len(everybody) == 5                                      # one row per fold
     assert (everybody["recall"] == 1).all() and (nobody["recall"] == 0).all()
     churn_rate = y_train.mean()
+    assert everybody["precision"].mean() == pytest.approx(churn_rate, abs=0.02)   # everybody flagged: precision = churn rate
+    assert (nobody["precision"] == 0).all()                         # nobody flagged: defined as 0, not an error
     # Contacting everybody wastes an offer on every loyal customer; contacting nobody misses every churner.
     assert everybody["cost"].mean() == pytest.approx(1 - churn_rate, abs=0.02)
     assert nobody["cost"].mean() == pytest.approx(5 * churn_rate, abs=0.05)
     again = cv_fold_scores(estimator, X_train, y_train, threshold=0.0, cost_ratio=5)
     assert everybody.equals(again)
+
+
+def test_fold_scores_that_do_not_depend_on_the_threshold_match_the_other_protocol_functions():
+    # The decision rule of the model-improvement section rests on `auc`, so it must be the same AUC, on the same
+    # folds, as cv_and_gap reports; `pr_auc` likewise, and `brier` (lower is better) is checked against sklearn.
+    X_train, y_train, X_test, y_test = make_data()
+    estimator = build_pipeline(LogisticRegression(), scale=True)
+
+    scores = cv_fold_scores(estimator, X_train, y_train, threshold=0.3, cost_ratio=5)
+    reference = cv_and_gap(estimator, X_train, y_train, X_test, y_test)
+    brier = -cross_val_score(estimator, X_train, y_train, scoring="neg_brier_score",
+                             cv=StratifiedKFold(5, shuffle=True, random_state=SEED))
+
+    assert scores["auc"].mean() == pytest.approx(reference["cv_auc"])
+    assert scores["pr_auc"].mean() == pytest.approx(reference["cv_pr_auc"])
+    assert scores["brier"].to_numpy() == pytest.approx(brier)
