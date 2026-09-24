@@ -1,11 +1,12 @@
 """Split, pipeline and evaluation protocol shared by every experiment."""
 import numpy as np
+import pandas as pd
 from sklearn.base import clone
 from sklearn.compose import ColumnTransformer, make_column_selector
 from sklearn.dummy import DummyClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (accuracy_score, average_precision_score, brier_score_loss, f1_score,
-                             precision_score, recall_score, roc_auc_score)
+                             make_scorer, precision_score, recall_score, roc_auc_score)
 from sklearn.model_selection import (GridSearchCV, StratifiedKFold, cross_val_predict, cross_validate,
                                      train_test_split)
 from sklearn.pipeline import Pipeline
@@ -126,3 +127,22 @@ def pick_threshold(y_true, proba, cost_ratio):
     grid = np.linspace(0.01, 0.99, 99)
     costs = [expected_cost(y_true, proba >= t, cost_ratio) for t in grid]
     return grid[int(np.argmin(costs))]
+
+
+def cv_fold_scores(estimator, X, y, threshold, cost_ratio, seed=SEED):
+    """Score of each of the 5 CV folds: ROC-AUC, PR-AUC, Brier, and recall, precision and expected cost at `threshold`.
+
+    The folds are the same for every estimator and the threshold is chosen in advance, not fitted on
+    these folds, so that variants of a model can be compared fold by fold. Nested for the tuned models.
+    """
+    def at_threshold(score):
+        return make_scorer(lambda y_true, proba: score(y_true, proba >= threshold), response_method="predict_proba")
+
+    scoring = {"auc": "roc_auc", "pr_auc": "average_precision", "neg_brier": "neg_brier_score",
+               "recall": at_threshold(recall_score),
+               "precision": at_threshold(lambda y_true, flagged: precision_score(y_true, flagged, zero_division=0)),
+               "neg_cost": at_threshold(lambda y_true, flagged: -expected_cost(y_true, flagged, cost_ratio))}
+    scores = cross_validate(estimator, X, y, cv=StratifiedKFold(5, shuffle=True, random_state=seed), scoring=scoring)
+    return pd.DataFrame({"auc": scores["test_auc"], "pr_auc": scores["test_pr_auc"], "brier": -scores["test_neg_brier"],
+                         "recall": scores["test_recall"], "precision": scores["test_precision"],
+                         "cost": -scores["test_neg_cost"]})

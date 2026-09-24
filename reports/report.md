@@ -33,7 +33,17 @@ Because only 26.5 % of customers churn, we report metrics of the **churn class**
 
 We compare three models: a **majority-class** baseline; **logistic regression** (L2, tuned `C`, standardised numeric features), the interpretable reference; and **XGBoost** (tuned depth and number of trees), the main model whose explanations we study.
 
-<!-- TODO (slices 3-5): explain XAI techniques and why each fits this model and data. -->
+## Explanation techniques
+
+We explain XGBoost with three complementary techniques and read logistic regression as an intrinsically interpretable reference. Explanations are computed on the test set and expressed in log-odds of churn (positive means towards churn). They describe the model, not the world.
+
+*Global.* **TreeSHAP** [5, 6] splits each prediction into one additive contribution per feature (exact Shapley values, fast for tree ensembles). It fits because the main model is a tree ensemble on tabular data, and its additivity lets us add the one-hot columns of a feature back together. Global importance is the mean absolute contribution: what the model **uses**. **Permutation importance** [7] shuffles one feature and measures the fall in test ROC-AUC: what the predictions **need**, in another unit and without opening the model. **Logistic regression contributions** (coefficient times distance to the average customer) give a reference in the same units as SHAP. All contributions are relative to the average training customer (TreeSHAP's are recentred on it, which for this additive model matches interventional SHAP within 0.07 log-odds). The three methods use different units, so we compare positions (rank correlation, top features), not magnitudes.
+
+*Evaluation.* We adapt to tabular SHAP the sanity checks of Adebayo et al. [8], designed for saliency maps of images. (1) **Label randomisation**: refit the tuned model on shuffled labels; its explanation must stop resembling the real one (rule fixed in advance: mean Spearman correlation below 0.5), with a control that refits on resampled rows keeping the labels. We randomise labels and not the model's parameters, because randomising the parameters of a tree ensemble has no natural equivalent and the assignment allows either. (2) **Shuffling the important features**: shuffling the k top-ranked features (ranking computed on the training set) must lower the test AUC by more than the 95th percentile of shuffling 30 random sets of k features, for k = 1, 2, 3. We apply it to the SHAP, permutation and logistic-regression rankings, and read the SHAP ranking backwards as a negative control.
+
+*Local.* The same TreeSHAP values, read for one customer, add up to that customer's log-odds. We show the customer at the median probability of each group (a churner flagged, a churner missed, a loyal customer flagged) at the operating threshold, instead of extreme cases.
+
+<!-- TODO (slice 7): counterfactuals (DiCE) in the actions section. -->
 
 # Results
 
@@ -65,7 +75,33 @@ At that threshold (Table 2) both models find 88-90 % of the churners, and about 
 
 ![**Figure 1.** Calibration on out-of-fold predictions of the training set (5,634 customers, 10 equal-count bins).](figures/calibration.png){ width=55% }
 
-<!-- TODO (slices 3-7): XAI results, actions and insights, discussion. -->
+## Global explanations
+
+Figure 2 compares the three methods. SHAP and permutation importance, both on XGBoost, share their top three features (contract type, tenure and type of internet service) and correlate at 0.83 over the 19 features; the logistic regression shares two of them (0.79 with SHAP, 0.61 with permutation). Beyond the top three the rankings are mostly noise: the permutation importances of several features are indistinguishable within their standard deviation. The disagreements are the informative part.
+
+(i) *Which feature is first depends on the method.* SHAP puts contract first by a small margin (19.4 % of its total against 17.6 % for tenure), permutation puts tenure first (43.8 % against 29.4 %), and the logistic regression puts MonthlyCharges first (22 %). SHAP measures how far the model's output moves because of a feature, permutation how much the AUC falls without it, so only positions can be compared across methods. (ii) *For MonthlyCharges, collinearity flips the sign.* The contracted services alone predict it with a cross-validated R² of 0.999, so it carries no information of its own. Its marginal correlation with churn is positive (+0.20), but the standardised logistic coefficient is −1.97: given the services the sign reverses, and the contribution runs from −3.4 to +3.1 log-odds against −0.91 to +0.54 in XGBoost. It must not be read as a pricing insight. (iii) *Correlated features duplicate credit.* Customers without internet service receive a negative contribution from each add-on feature on top of the one from InternetService itself.
+
+![**Figure 2.** Importance of the ten leading features by method, each as a share of its own total (test set). Table values are in the notebook.](figures/importance_by_method.png){ width=82% }
+
+Figure 3 shows the shape of the two main numeric effects. The effect of tenure is not linear: +1.48 log-odds in the first two months, +0.39 at 7 to 12 months, about 0 at 13 to 24 and −0.48 at 49 to 71 (the jump at the maximum value, 72, is a boundary effect we do not interpret). By level, month-to-month contracts add +0.55 log-odds against −1.00 for two-year contracts, fibre optic +0.42 against −0.32 for DSL, and electronic check +0.23 against −0.12 for the other payment methods. These are differences in what the model *predicts* between groups of customers, not the effect of changing a customer's contract.
+
+![**Figure 3.** Contribution of tenure and monthly charges to the log-odds of churn: XGBoost (one dot per test customer) and the straight line of the logistic regression.](figures/effects_numeric.png){ width=82% }
+
+## Sanity checks of the explanations
+
+Both checks were run with rules fixed before seeing the results. *Label randomisation is passed.* A model fitted on shuffled labels has a test AUC of 0.517 and its explanation correlates 0.31 on average with the real one (range 0.04 to 0.60), against 0.92 for refits that keep the labels, and its total attribution falls to about 15 % of the real model's (0.46 against 3.12). The correlation is not zero: a model with no signal still ranks TotalCharges, MonthlyCharges, tenure and PaymentMethod highest, because continuous features offer more places to split, so a high rank for a numeric feature is not evidence by itself.
+
+*Shuffling the top features* (Figure 4) is passed by the SHAP and permutation rankings and failed by the logistic regression's. Shuffling the top 2 and top 3 SHAP features costs 0.159 and 0.191 of AUC, against 95th percentiles of 0.069 and 0.124 for random features (permutation ranking: 0.161 and 0.188). At k = 1 SHAP passes only narrowly (0.048 against 0.046). The logistic ranking fails (0.004, 0.061, 0.095) because its first feature, MonthlyCharges, is redundant for XGBoost: it explains a different model. The SHAP ranking read backwards costs 0.000 for every k, so the check is able to say no. Two caveats: the permutation ranking is favoured by construction, since it optimises the same quantity, and shuffling one feature of a correlated pair leaves the other intact, which understates the damage.
+
+![**Figure 4.** Fall in test AUC after shuffling the k top-ranked features of each ranking, against 30 random sets of k features.](figures/sanity_deletion.png){ width=62% }
+
+## Local explanations
+
+Figure 5 explains three typical customers. **A**, a churner the model flags (P = 0.56), is pushed up by a month-to-month contract (+0.55), fibre optic (+0.42), electronic check (+0.23) and no online security (+0.22): reasons the operator can act on. **B**, a churner the model misses (P = 0.10), has a two-year contract (−1.00), 57 months of tenure (−0.42) and a large accumulated bill (−0.35) that outweigh a high monthly charge and fibre optic (+0.50, +0.42). Every loyalty marker points the other way, and what made this customer leave is not in the data (an inference: complaints or competing offers are not observed). **C**, a wasted offer (P = 0.37), is flagged for a month-to-month contract and no add-ons: it looks like a churner and stayed. SHAP explains the model's score, not the customer's reason, and case B shows contributions for MonthlyCharges and TotalCharges although both are redundant, the credit-splitting problem discussed above.
+
+![**Figure 5.** SHAP contributions (log-odds) of three typical customers, relative to the average training customer.](figures/local_cases.png){ width=64% }
+
+<!-- TODO (slices 6-7): actions and insights, discussion. -->
 
 # References
 
@@ -73,3 +109,7 @@ At that threshold (Table 2) both models find 88-90 % of the churners, and about 
 2. A. El Attar and M. El-Hajj, "Explainable AI-driven customer churn prediction: a multi-model ensemble approach with SHAP-based feature analysis," *Frontiers in Artificial Intelligence*, vol. 9, art. 1748799, 2026.
 3. IBM, "Telco Customer Churn" sample data set, <https://raw.githubusercontent.com/IBM/telco-customer-churn-on-icp4d/master/data/Telco-Customer-Churn.csv>.
 4. S.-V. Oprea and A. Bâra, "Customer-Centric Decision-Making with XAI and Counterfactual Explanations for Churn Mitigation," *J. Theor. Appl. Electron. Commer. Res.*, vol. 20, no. 2, art. 129, 2025. doi:10.3390/jtaer20020129.
+5. S. M. Lundberg and S.-I. Lee, "A Unified Approach to Interpreting Model Predictions," *Advances in Neural Information Processing Systems 30 (NeurIPS 2017)*, 2017.
+6. S. M. Lundberg, G. Erion, H. Chen *et al.*, "From local explanations to global understanding with explainable AI for trees," *Nature Machine Intelligence*, vol. 2, pp. 56-67, 2020. doi:10.1038/s42256-019-0138-9.
+7. A. Fisher, C. Rudin and F. Dominici, "All Models are Wrong, but Many are Useful: Learning a Variable's Importance by Studying an Entire Class of Prediction Models Simultaneously," *J. Mach. Learn. Res.*, vol. 20, 2019. <https://jmlr.org/papers/v20/18-760.html>
+8. J. Adebayo, J. Gilmer, M. Muelly, I. Goodfellow, M. Hardt and B. Kim, "Sanity Checks for Saliency Maps," *Advances in Neural Information Processing Systems 31 (NeurIPS 2018)*, 2018. arXiv:1810.03292.

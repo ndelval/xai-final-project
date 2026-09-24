@@ -7,8 +7,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 from xgboost import XGBClassifier
 
-from src.modeling import (build_pipeline, churn_metrics, customer_costs, cv_and_gap, expected_cost,
-                          make_models, oof_proba, pick_threshold, split)
+from src.modeling import (build_pipeline, churn_metrics, customer_costs, cv_and_gap, cv_fold_scores,
+                          expected_cost, make_models, oof_proba, pick_threshold, split)
 
 CONTRACTS = ("monthly", "yearly", "biennial")
 
@@ -180,3 +180,22 @@ def test_oof_predictions_are_in_row_order_and_work_with_a_grid_search():
 
     assert oof.shape == (len(y_train),)
     assert roc_auc_score(y_train, oof) > 0.75
+
+
+# --- Per-fold scores for comparing variants of the model ---------------------------------------
+
+def test_fold_scores_use_the_given_threshold_and_the_same_folds_every_time():
+    X_train, y_train, _, _ = make_data()
+    estimator = build_pipeline(LogisticRegression(), scale=True)
+
+    everybody = cv_fold_scores(estimator, X_train, y_train, threshold=0.0, cost_ratio=5)
+    nobody = cv_fold_scores(estimator, X_train, y_train, threshold=1.01, cost_ratio=5)
+
+    assert len(everybody) == 5                                      # one row per fold
+    assert (everybody["recall"] == 1).all() and (nobody["recall"] == 0).all()
+    churn_rate = y_train.mean()
+    # Contacting everybody wastes an offer on every loyal customer; contacting nobody misses every churner.
+    assert everybody["cost"].mean() == pytest.approx(1 - churn_rate, abs=0.02)
+    assert nobody["cost"].mean() == pytest.approx(5 * churn_rate, abs=0.05)
+    again = cv_fold_scores(estimator, X_train, y_train, threshold=0.0, cost_ratio=5)
+    assert everybody.equals(again)
