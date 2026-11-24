@@ -1,0 +1,295 @@
+{
+  "seed": 42,
+  "study_status": "exploratory extension after inspection of initial test explanations",
+  "cost_ratio": 5,
+  "threshold": 0.16666666666666666,
+  "selected_variant": "without both",
+  "dropped_features": [
+    "MonthlyCharges",
+    "TotalCharges"
+  ],
+  "cv_variants": {
+    "baseline (19 features)": {
+      "features": 19.0,
+      "CV AUC": 0.850793,
+      "AUC vs baseline": 0.0,
+      "  (std of paired diff)": 0.0,
+      "CV PR-AUC": 0.671976,
+      "CV Brier": 0.132967,
+      "recall": 0.89699,
+      "precision": 0.45658,
+      "cost": 0.420476,
+      "cost vs baseline": 0.0
+    },
+    "without MonthlyCharges": {
+      "features": 18.0,
+      "CV AUC": 0.850717,
+      "AUC vs baseline": -7.5e-05,
+      "  (std of paired diff)": 0.001261,
+      "CV PR-AUC": 0.672057,
+      "CV Brier": 0.132999,
+      "recall": 0.895652,
+      "precision": 0.454316,
+      "cost": 0.424203,
+      "cost vs baseline": 0.003727
+    },
+    "without TotalCharges": {
+      "features": 18.0,
+      "CV AUC": 0.850558,
+      "AUC vs baseline": -0.000235,
+      "  (std of paired diff)": 0.000446,
+      "CV PR-AUC": 0.670883,
+      "CV Brier": 0.133384,
+      "recall": 0.894983,
+      "precision": 0.452656,
+      "cost": 0.426865,
+      "cost vs baseline": 0.006389
+    },
+    "without both": {
+      "features": 17.0,
+      "CV AUC": 0.850938,
+      "AUC vs baseline": 0.000145,
+      "  (std of paired diff)": 0.001335,
+      "CV PR-AUC": 0.671901,
+      "CV Brier": 0.133035,
+      "recall": 0.896321,
+      "precision": 0.45593,
+      "cost": 0.421542,
+      "cost vs baseline": 0.001067
+    }
+  },
+  "before_after": {
+    "before": {
+      "features": 19,
+      "CV AUC": 0.8507929192110634,
+      "test AUC": 0.8481231754889044,
+      "train-CV gap": 0.008217837664727834,
+      "test PR-AUC": 0.6699302582306396,
+      "Brier": 0.13427411019802094,
+      "recall": 0.8850267379679144,
+      "precision": 0.4559228650137741,
+      "cost per customer": 0.43293115684882894
+    },
+    "after": {
+      "features": 17,
+      "CV AUC": 0.8509375880803457,
+      "test AUC": 0.848249761037485,
+      "train-CV gap": 0.005277086972733769,
+      "test PR-AUC": 0.6691125748556263,
+      "Brier": 0.13457639515399933,
+      "recall": 0.8796791443850267,
+      "precision": 0.4575799721835883,
+      "cost per customer": 0.4364797728885735
+    }
+  },
+  "stability": {
+    "before": 0.8820260995291381,
+    "after": 0.8942577030812325
+  },
+  "final_xai": {
+    "label_randomisation": {
+      "mean_shuffled_spearman": 0.3536764705882353,
+      "mean_control_spearman": 0.9318627450980393,
+      "passes": true
+    },
+    "deletion": [
+      {
+        "ranking": "xgboost",
+        "k": 1,
+        "top_k_drop": 0.09598116717042561,
+        "random_median": 0.0013453977111267347,
+        "random_low": -3.2478235035641845e-05,
+        "random_high": 0.056040171536335316,
+        "reference_subsets": 17,
+        "permutations_per_subset": 50,
+        "passes": true
+      },
+      {
+        "ranking": "reversed",
+        "k": 1,
+        "top_k_drop": 1.906533364346208e-05,
+        "random_median": 0.0013453977111267347,
+        "random_low": -3.2478235035641845e-05,
+        "random_high": 0.056040171536335316,
+        "reference_subsets": 17,
+        "permutations_per_subset": 50,
+        "passes": false
+      },
+      {
+        "ranking": "xgboost",
+        "k": 2,
+        "top_k_drop": 0.18630964375209916,
+        "random_median": 0.0035540830297864866,
+        "random_low": 0.00012151566819103288,
+        "random_high": 0.09541573019194512,
+        "reference_subsets": 136,
+        "permutations_per_subset": 10,
+        "passes": true
+      },
+      {
+        "ranking": "reversed",
+        "k": 2,
+        "top_k_drop": -5.050505050487875e-05,
+        "random_median": 0.0035540830297864866,
+        "random_low": 0.00012151566819103288,
+        "random_high": 0.09541573019194512,
+        "reference_subsets": 136,
+        "permutations_per_subset": 10,
+        "passes": false
+      },
+      {
+        "ranking": "xgboost",
+        "k": 3,
+        "top_k_drop": 0.23690537084398997,
+        "random_median": 0.006873659872381216,
+        "random_low": 0.0008903162055337211,
+        "random_high": 0.11118658451522913,
+        "reference_subsets": 200,
+        "permutations_per_subset": 10,
+        "passes": true
+      },
+      {
+        "ranking": "reversed",
+        "k": 3,
+        "top_k_drop": 0.0003150430132529136,
+        "random_median": 0.006873659872381216,
+        "random_low": 0.0008903162055337211,
+        "random_high": 0.11118658451522913,
+        "reference_subsets": 200,
+        "permutations_per_subset": 10,
+        "passes": false
+      }
+    ]
+  },
+  "business": {
+    "at_risk_customers": 611,
+    "lever_scenarios": {
+      "add-ons and billing only": {
+        "below the threshold": 0.255319,
+        "one change is enough": 0.06874,
+        "  of which the contract": 0.0,
+        "median changes": 2.0,
+        "risk before (solved)": 0.283334,
+        "risk after (solved)": 0.148318
+      },
+      "+ contract up to one year": {
+        "below the threshold": 0.697218,
+        "one change is enough": 0.184943,
+        "  of which the contract": 0.184943,
+        "median changes": 3.0,
+        "risk before (solved)": 0.412072,
+        "risk after (solved)": 0.140096
+      },
+      "+ contract up to two years": {
+        "below the threshold": 0.91653,
+        "one change is enough": 0.494272,
+        "  of which the contract": 0.494272,
+        "median changes": 1.0,
+        "risk before (solved)": 0.474101,
+        "risk after (solved)": 0.121314
+      }
+    },
+    "common_cohort_scenarios": {
+      "add-ons and billing only": {
+        "customers": 156.0,
+        "risk before": 0.283334,
+        "risk after": 0.148318,
+        "fall in risk": 0.135016
+      },
+      "+ contract up to one year": {
+        "customers": 156.0,
+        "risk before": 0.283334,
+        "risk after": 0.127785,
+        "fall in risk": 0.155549
+      },
+      "+ contract up to two years": {
+        "customers": 156.0,
+        "risk before": 0.283334,
+        "risk after": 0.076628,
+        "fall in risk": 0.206707
+      }
+    },
+    "counterfactuals": [
+      {
+        "customer": "median-risk flagged customer",
+        "source": "DiCE",
+        "changes": "Contract: Month-to-month -> Two year; PaperlessBilling: Yes -> No",
+        "n changes": 2,
+        "minimal": "yes",
+        "P(churn)": 0.12199965119361877
+      },
+      {
+        "customer": "median-risk flagged customer",
+        "source": "DiCE",
+        "changes": "Contract: Month-to-month -> Two year; PaymentMethod: Electronic check -> Mailed check",
+        "n changes": 2,
+        "minimal": "yes",
+        "P(churn)": 0.12316334247589111
+      },
+      {
+        "customer": "median-risk flagged customer",
+        "source": "DiCE",
+        "changes": "Contract: Month-to-month -> Two year; OnlineSecurity: No -> Yes",
+        "n changes": 2,
+        "minimal": "yes",
+        "P(churn)": 0.12218533456325531
+      },
+      {
+        "customer": "median-risk flagged customer",
+        "source": "current",
+        "changes": "-",
+        "n changes": 0,
+        "minimal": "",
+        "P(churn)": 0.4969393312931061
+      },
+      {
+        "customer": "median-risk flagged customer",
+        "source": "exhaustive minimum",
+        "changes": "Contract: Month-to-month -> Two year; PaperlessBilling: Yes -> No",
+        "n changes": 2,
+        "minimal": "yes",
+        "P(churn)": 0.12199965119361877
+      },
+      {
+        "customer": "median-risk, tenure <= 12",
+        "source": "DiCE",
+        "changes": "Contract: Month-to-month -> Two year; OnlineSecurity: No -> Yes; OnlineBackup: No -> Yes",
+        "n changes": 3,
+        "minimal": "yes",
+        "P(churn)": 0.16032592952251434
+      },
+      {
+        "customer": "median-risk, tenure <= 12",
+        "source": "DiCE",
+        "changes": "Contract: Month-to-month -> Two year; PaymentMethod: Electronic check -> Credit card (automatic); TechSupport: No -> Yes",
+        "n changes": 3,
+        "minimal": "yes",
+        "P(churn)": 0.1434495896100998
+      },
+      {
+        "customer": "median-risk, tenure <= 12",
+        "source": "DiCE",
+        "changes": "Contract: Month-to-month -> Two year; PaymentMethod: Electronic check -> Credit card (automatic); OnlineSecurity: No -> Yes",
+        "n changes": 3,
+        "minimal": "yes",
+        "P(churn)": 0.13341891765594482
+      },
+      {
+        "customer": "median-risk, tenure <= 12",
+        "source": "current",
+        "changes": "-",
+        "n changes": 0,
+        "minimal": "",
+        "P(churn)": 0.6090027689933777
+      },
+      {
+        "customer": "median-risk, tenure <= 12",
+        "source": "exhaustive minimum",
+        "changes": "Contract: Month-to-month -> Two year; PaymentMethod: Electronic check -> Bank transfer (automatic); OnlineSecurity: No -> Yes",
+        "n changes": 3,
+        "minimal": "yes",
+        "P(churn)": 0.1326810121536255
+      }
+    ]
+  }
+}

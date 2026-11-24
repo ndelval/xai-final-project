@@ -1,0 +1,152 @@
+{
+  "protocol": {
+    "reference_budget": 200,
+    "criterion_quantile": 0.95,
+    "single_feature_permutations": 50,
+    "other_permutations": 10,
+    "status": "reference strengthened after exploratory audit; original diagnostic thresholds retained"
+  },
+  "label_randomisation": {
+    "mean_shuffled_spearman": 0.3089074452709912,
+    "mean_control_spearman": 0.921553359610462,
+    "min_shuffled_spearman": 0.04036858659791362,
+    "max_shuffled_spearman": 0.6028960650601447,
+    "shuffled_test_auc": 0.5166188741636312,
+    "randomised_total_attribution": 0.4636136647838914,
+    "original_total_attribution": 3.1183494378739067
+  },
+  "deletion": [
+    {
+      "ranking": "xgboost",
+      "k": 1,
+      "top_k_drop": 0.04532480818414319,
+      "random_median": 0.0015350435299284393,
+      "random_low": -3.526570048310318e-05,
+      "random_high": 0.04752357849595693,
+      "reference_subsets": 19,
+      "permutations_per_subset": 50,
+      "passes": false
+    },
+    {
+      "ranking": "permutation",
+      "k": 1,
+      "top_k_drop": 0.0673125113022811,
+      "random_median": 0.0015350435299284393,
+      "random_low": -3.526570048310318e-05,
+      "random_high": 0.04752357849595693,
+      "reference_subsets": 19,
+      "permutations_per_subset": 50,
+      "passes": true
+    },
+    {
+      "ranking": "logistic",
+      "k": 1,
+      "top_k_drop": 0.003936552222997234,
+      "random_median": 0.0015350435299284393,
+      "random_low": -3.526570048310318e-05,
+      "random_high": 0.04752357849595693,
+      "reference_subsets": 19,
+      "permutations_per_subset": 50,
+      "passes": false
+    },
+    {
+      "ranking": "reversed",
+      "k": 1,
+      "top_k_drop": 0.0,
+      "random_median": 0.0015350435299284393,
+      "random_low": -3.526570048310318e-05,
+      "random_high": 0.04752357849595693,
+      "reference_subsets": 19,
+      "permutations_per_subset": 50,
+      "passes": false
+    },
+    {
+      "ranking": "xgboost",
+      "k": 2,
+      "top_k_drop": 0.1509743212172879,
+      "random_median": 0.00459428039990697,
+      "random_low": 3.022552894676456e-05,
+      "random_high": 0.06620669611718207,
+      "reference_subsets": 171,
+      "permutations_per_subset": 10,
+      "passes": true
+    },
+    {
+      "ranking": "permutation",
+      "k": 2,
+      "top_k_drop": 0.1509743212172879,
+      "random_median": 0.00459428039990697,
+      "random_low": 3.022552894676456e-05,
+      "random_high": 0.06620669611718207,
+      "reference_subsets": 171,
+      "permutations_per_subset": 10,
+      "passes": true
+    },
+    {
+      "ranking": "logistic",
+      "k": 2,
+      "top_k_drop": 0.061735901211604494,
+      "random_median": 0.00459428039990697,
+      "random_low": 3.022552894676456e-05,
+      "random_high": 0.06620669611718207,
+      "reference_subsets": 171,
+      "permutations_per_subset": 10,
+      "passes": false
+    },
+    {
+      "ranking": "reversed",
+      "k": 2,
+      "top_k_drop": 0.0,
+      "random_median": 0.00459428039990697,
+      "random_low": 3.022552894676456e-05,
+      "random_high": 0.06620669611718207,
+      "reference_subsets": 171,
+      "permutations_per_subset": 10,
+      "passes": false
+    },
+    {
+      "ranking": "xgboost",
+      "k": 3,
+      "top_k_drop": 0.18816321785631246,
+      "random_median": 0.009394068562866509,
+      "random_low": 0.000533364333875849,
+      "random_high": 0.08378568291611758,
+      "reference_subsets": 200,
+      "permutations_per_subset": 10,
+      "passes": true
+    },
+    {
+      "ranking": "permutation",
+      "k": 3,
+      "top_k_drop": 0.18816321785631246,
+      "random_median": 0.009394068562866509,
+      "random_low": 0.000533364333875849,
+      "random_high": 0.08378568291611758,
+      "reference_subsets": 200,
+      "permutations_per_subset": 10,
+      "passes": true
+    },
+    {
+      "ranking": "logistic",
+      "k": 3,
+      "top_k_drop": 0.09778371954842538,
+      "random_median": 0.009394068562866509,
+      "random_low": 0.000533364333875849,
+      "random_high": 0.08378568291611758,
+      "reference_subsets": 200,
+      "permutations_per_subset": 10,
+      "passes": true
+    },
+    {
+      "ranking": "reversed",
+      "k": 3,
+      "top_k_drop": -2.0279521558330683e-05,
+      "random_median": 0.009394068562866509,
+      "random_low": 0.000533364333875849,
+      "random_high": 0.08378568291611758,
+      "reference_subsets": 200,
+      "permutations_per_subset": 10,
+      "passes": false
+    }
+  ]
+}

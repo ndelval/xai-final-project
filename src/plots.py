@@ -88,9 +88,9 @@ def deletion_plot(results, labels, ax):
     random_low and random_high (the random sets are the same for every ranking).
     """
     random = results[results["ranking"] == results["ranking"].iloc[0]].set_index("k")
-    ax.fill_between(random.index, random["random_low"], random["random_high"], color=GRID, label="Random features (5-95 %)")
+    ax.fill_between(random.index, random["random_low"], random["random_high"], color=GRID, label="Reference subsets (5-95 %)")
     ax.plot(random.index, random["random_median"], color=COLORS["baseline"], lw=1.5, ls=(0, (4, 3)),
-            label="Random features (median)")
+            label="Reference subsets (median)")
     for key in labels:
         rows = results[results["ranking"] == key].set_index("k")
         ax.plot(rows.index, rows["top_k_drop"], color=COLORS[key], marker=MARKERS[key], lw=2, ms=6.5,

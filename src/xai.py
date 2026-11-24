@@ -5,6 +5,7 @@ feature such as Contract is spread over several columns. Contributions are addit
 columns of each feature back together: that is what a person reads ("Contract", not "Contract_One year").
 """
 import itertools
+from math import comb
 
 import numpy as np
 import pandas as pd
@@ -109,17 +110,45 @@ def auc_drop(model, X, y, features, n_repeats, rng):
     return float(np.mean(drops))
 
 
-def top_k_vs_random_k(model, X, y, ranking, k, n_random=30, n_repeats=5, seed=SEED):
-    """Fall in AUC after shuffling the k top-ranked features, and after shuffling many random sets of k.
+def reference_auc_drops(model, X, y, columns, k, n_random=200, n_repeats=10, seed=SEED):
+    """AUC drops for uniformly weighted, distinct subsets of k original features.
 
-    Columns are shuffled in the original data, before the pipeline. Returns (drop of the top k, drops of the random sets).
+    Enumerate every singleton and any combination space no larger than the sampling budget.
+    Otherwise sample distinct subsets uniformly without replacement. A fixed permutation stream
+    is used for each sorted subset, so its score is independent of ranking order and can be reused.
+    Exhaustive here means exhaustive feature subsets; each drop still averages finite permutations.
     """
+    pool = sorted(columns)
+    if not 1 <= k <= len(pool) or n_random < 1 or n_repeats < 1:
+        raise ValueError("k must be between 1 and the feature count; budgets must be positive")
     rng = np.random.default_rng(seed)
-    top = auc_drop(model, X, y, list(ranking[:k]), n_repeats, rng)
-    pool = sorted(ranking)  # the random sets do not depend on the order of the ranking, so rankings are compared on the same ones
-    random = [auc_drop(model, X, y, list(rng.choice(pool, k, replace=False)), n_repeats, rng)
-              for _ in range(n_random)]
-    return top, np.array(random)
+    if k == 1 or comb(len(pool), k) <= n_random:
+        subsets = list(itertools.combinations(pool, k))
+    else:
+        subsets = set()
+        while len(subsets) < n_random:
+            subsets.add(tuple(sorted(rng.choice(pool, k, replace=False))))
+        subsets = sorted(subsets)
+    return {
+        subset: auc_drop(model, X, y, subset, n_repeats, np.random.default_rng(seed))
+        for subset in subsets
+    }
+
+
+def top_k_vs_random_k(model, X, y, ranking, k, n_random=200, n_repeats=10, seed=SEED, reference=None):
+    """AUC drop of the top k versus a reference of distinct k-feature subsets.
+
+    Pass a reference computed by `reference_auc_drops` for this model, data, k, seed and repeat
+    count to compare several rankings without recomputing it. The same subset gets the same score.
+    The percentile comparison is a diagnostic rule, not a calibrated statistical significance test.
+    """
+    if reference is None:
+        reference = reference_auc_drops(model, X, y, ranking, k, n_random, n_repeats, seed)
+    subset = tuple(sorted(ranking[:k]))
+    top = reference.get(subset)
+    if top is None:
+        top = auc_drop(model, X, y, subset, n_repeats, np.random.default_rng(seed))
+    return top, np.asarray(list(reference.values()))
 
 
 def median_case(proba, group):

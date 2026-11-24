@@ -1,21 +1,35 @@
 """Split, pipeline and evaluation protocol shared by every experiment."""
+
 import numpy as np
 import pandas as pd
 from sklearn.base import clone
 from sklearn.compose import ColumnTransformer, make_column_selector
 from sklearn.dummy import DummyClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import (accuracy_score, average_precision_score, brier_score_loss, f1_score,
-                             make_scorer, precision_score, recall_score, roc_auc_score)
-from sklearn.model_selection import (GridSearchCV, StratifiedKFold, cross_val_predict, cross_validate,
-                                     train_test_split)
+from sklearn.metrics import (
+    accuracy_score,
+    average_precision_score,
+    brier_score_loss,
+    f1_score,
+    make_scorer,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
+from sklearn.model_selection import (
+    GridSearchCV,
+    StratifiedKFold,
+    cross_val_predict,
+    cross_validate,
+    train_test_split,
+)
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from xgboost import XGBClassifier
 
 SEED = 42
-MAX_AUC_GAP = 0.03  # "not overfitted" means train AUC minus CV AUC below this. Fixed before tuning.
-SUSPICIOUS_AUC = 0.90  # a CV AUC above this on Telco (papers report ~0.84-0.86) is leakage until proven otherwise
+MAX_AUC_GAP = 0.03
+SUSPICIOUS_AUC = 0.90
 
 
 def split(X, y, seed=SEED):
@@ -31,11 +45,18 @@ def build_pipeline(estimator, scale=False):
     Everything is fitted inside the pipeline: cross-validation refits it on each training fold.
     """
     numeric = StandardScaler() if scale else "passthrough"
-    prep = ColumnTransformer([
-        ("num", numeric, make_column_selector(dtype_include="number")),
-        ("cat", OneHotEncoder(drop="if_binary", handle_unknown="ignore", sparse_output=False),
-         make_column_selector(dtype_exclude="number")),
-    ])
+    prep = ColumnTransformer(
+        [
+            ("num", numeric, make_column_selector(dtype_include="number")),
+            (
+                "cat",
+                OneHotEncoder(
+                    drop="if_binary", handle_unknown="ignore", sparse_output=False
+                ),
+                make_column_selector(dtype_exclude="number"),
+            ),
+        ]
+    )
     return Pipeline([("prep", prep), ("model", estimator)])
 
 
@@ -49,12 +70,22 @@ def make_models(seed=SEED):
     logistic = GridSearchCV(
         build_pipeline(LogisticRegression(max_iter=1000), scale=True),
         {"model__C": [0.01, 0.1, 1, 10, 100]},
-        scoring="roc_auc", cv=inner_cv)
+        scoring="roc_auc",
+        cv=inner_cv,
+    )
     xgboost = GridSearchCV(
-        build_pipeline(XGBClassifier(learning_rate=0.05, subsample=0.8, colsample_bytree=0.8,
-                                     random_state=seed)),
+        build_pipeline(
+            XGBClassifier(
+                learning_rate=0.05,
+                subsample=0.8,
+                colsample_bytree=0.8,
+                random_state=seed,
+            )
+        ),
         {"model__max_depth": [1, 2, 3], "model__n_estimators": [150, 300, 600]},
-        scoring="roc_auc", cv=inner_cv)
+        scoring="roc_auc",
+        cv=inner_cv,
+    )
     return {
         "majority": build_pipeline(DummyClassifier(strategy="prior")),
         "logistic": logistic,
@@ -73,14 +104,26 @@ def cv_and_gap(estimator, X_train, y_train, X_test, y_test, seed=SEED):
     fitting or tuning. PR-AUC of a model with no skill equals the churn rate (0.265).
     """
     outer_cv = StratifiedKFold(5, shuffle=True, random_state=seed)
-    cv = cross_validate(estimator, X_train, y_train, cv=outer_cv, return_train_score=True,
-                        scoring={"auc": "roc_auc", "pr_auc": "average_precision"})
+    cv = cross_validate(
+        estimator,
+        X_train,
+        y_train,
+        cv=outer_cv,
+        return_train_score=True,
+        scoring={"auc": "roc_auc", "pr_auc": "average_precision"},
+    )
     train_auc, cv_auc = cv["train_auc"].mean(), cv["test_auc"].mean()
 
     proba = clone(estimator).fit(X_train, y_train).predict_proba(X_test)[:, 1]
-    return {"train_auc": train_auc, "cv_auc": cv_auc, "cv_std": cv["test_auc"].std(),
-            "test_auc": roc_auc_score(y_test, proba), "gap": train_auc - cv_auc,
-            "cv_pr_auc": cv["test_pr_auc"].mean(), "test_pr_auc": average_precision_score(y_test, proba)}
+    return {
+        "train_auc": train_auc,
+        "cv_auc": cv_auc,
+        "cv_std": cv["test_auc"].std(),
+        "test_auc": roc_auc_score(y_test, proba),
+        "gap": train_auc - cv_auc,
+        "cv_pr_auc": cv["test_pr_auc"].mean(),
+        "test_pr_auc": average_precision_score(y_test, proba),
+    }
 
 
 def oof_proba(estimator, X_train, y_train, seed=SEED):
@@ -90,7 +133,9 @@ def oof_proba(estimator, X_train, y_train, seed=SEED):
     probabilities are not the over-confident ones a model gives to rows it was fitted on.
     """
     cv = StratifiedKFold(5, shuffle=True, random_state=seed)
-    return cross_val_predict(estimator, X_train, y_train, cv=cv, method="predict_proba")[:, 1]
+    return cross_val_predict(
+        estimator, X_train, y_train, cv=cv, method="predict_proba"
+    )[:, 1]
 
 
 def churn_metrics(y_true, proba, threshold):
@@ -100,12 +145,14 @@ def churn_metrics(y_true, proba, threshold):
     dominated by the loyal customers and hides how well the churners are found.
     """
     pred = np.asarray(proba) >= threshold
-    return {"precision": precision_score(y_true, pred, zero_division=0),
-            "recall": recall_score(y_true, pred),
-            "f1": f1_score(y_true, pred, zero_division=0),
-            "accuracy": accuracy_score(y_true, pred),
-            "pr_auc": average_precision_score(y_true, proba),
-            "brier": brier_score_loss(y_true, proba)}
+    return {
+        "precision": precision_score(y_true, pred, zero_division=0),
+        "recall": recall_score(y_true, pred),
+        "f1": f1_score(y_true, pred, zero_division=0),
+        "accuracy": accuracy_score(y_true, pred),
+        "pr_auc": average_precision_score(y_true, proba),
+        "brier": brier_score_loss(y_true, proba),
+    }
 
 
 def customer_costs(y_true, pred, cost_ratio):
@@ -135,14 +182,39 @@ def cv_fold_scores(estimator, X, y, threshold, cost_ratio, seed=SEED):
     The folds are the same for every estimator and the threshold is chosen in advance, not fitted on
     these folds, so that variants of a model can be compared fold by fold. Nested for the tuned models.
     """
-    def at_threshold(score):
-        return make_scorer(lambda y_true, proba: score(y_true, proba >= threshold), response_method="predict_proba")
 
-    scoring = {"auc": "roc_auc", "pr_auc": "average_precision", "neg_brier": "neg_brier_score",
-               "recall": at_threshold(recall_score),
-               "precision": at_threshold(lambda y_true, flagged: precision_score(y_true, flagged, zero_division=0)),
-               "neg_cost": at_threshold(lambda y_true, flagged: -expected_cost(y_true, flagged, cost_ratio))}
-    scores = cross_validate(estimator, X, y, cv=StratifiedKFold(5, shuffle=True, random_state=seed), scoring=scoring)
-    return pd.DataFrame({"auc": scores["test_auc"], "pr_auc": scores["test_pr_auc"], "brier": -scores["test_neg_brier"],
-                         "recall": scores["test_recall"], "precision": scores["test_precision"],
-                         "cost": -scores["test_neg_cost"]})
+    def at_threshold(score):
+        return make_scorer(
+            lambda y_true, proba: score(y_true, proba >= threshold),
+            response_method="predict_proba",
+        )
+
+    scoring = {
+        "auc": "roc_auc",
+        "pr_auc": "average_precision",
+        "neg_brier": "neg_brier_score",
+        "recall": at_threshold(recall_score),
+        "precision": at_threshold(
+            lambda y_true, flagged: precision_score(y_true, flagged, zero_division=0)
+        ),
+        "neg_cost": at_threshold(
+            lambda y_true, flagged: -expected_cost(y_true, flagged, cost_ratio)
+        ),
+    }
+    scores = cross_validate(
+        estimator,
+        X,
+        y,
+        cv=StratifiedKFold(5, shuffle=True, random_state=seed),
+        scoring=scoring,
+    )
+    return pd.DataFrame(
+        {
+            "auc": scores["test_auc"],
+            "pr_auc": scores["test_pr_auc"],
+            "brier": -scores["test_neg_brier"],
+            "recall": scores["test_recall"],
+            "precision": scores["test_precision"],
+            "cost": -scores["test_neg_cost"],
+        }
+    )

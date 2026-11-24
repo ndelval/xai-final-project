@@ -6,12 +6,12 @@ leak. Anything that is fitted (imputers, encoders, scalers) lives in the Pipelin
 
 Run `python -m src.data` to download the file and print a one-line summary.
 """
+
 import urllib.request
 from pathlib import Path
 
 import pandas as pd
 
-# IBM sample data set, public GitHub mirror (no login needed).
 URL = "https://raw.githubusercontent.com/IBM/telco-customer-churn-on-icp4d/master/data/Telco-Customer-Churn.csv"
 RAW_PATH = Path(__file__).resolve().parent.parent / "data" / "raw" / "telco_churn.csv"
 EXPECTED_SHAPE = (7043, 21)
@@ -24,7 +24,9 @@ def download(path: Path = RAW_PATH) -> Path:
         urllib.request.urlretrieve(URL, path)
     shape = pd.read_csv(path).shape
     if shape != EXPECTED_SHAPE:
-        raise ValueError(f"{path} has shape {shape}, expected {EXPECTED_SHAPE}: delete it and retry")
+        raise ValueError(
+            f"{path} has shape {shape}, expected {EXPECTED_SHAPE}: delete it and retry"
+        )
     return path
 
 
@@ -32,9 +34,6 @@ def load_clean(path: Path = RAW_PATH) -> tuple[pd.DataFrame, pd.Series]:
     """Return the features X (19 columns) and the target y (1 = the customer churned)."""
     df = pd.read_csv(path)
 
-    # TotalCharges is text because 11 rows hold a blank. In the real file all of them are
-    # customers with tenure 0 (signed up, not billed yet), so 0 is their true value. If a blank
-    # ever shows up for a billed customer it is a data error, and we stop instead of hiding it.
     total = pd.to_numeric(df["TotalCharges"], errors="coerce")
     if (df.loc[total.isna(), "tenure"] != 0).any():
         raise ValueError("TotalCharges is blank for a customer with tenure > 0")

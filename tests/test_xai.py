@@ -7,6 +7,7 @@ from sklearn.linear_model import LogisticRegression
 from xgboost import XGBClassifier
 
 from src.modeling import build_pipeline
+import src.xai as xai_module
 from src.xai import (MAX_RANDOMIZED_SPEARMAN, RANDOM_QUANTILE, auc_drop, bootstrap_rows, by_original_feature,
                      ShiftedThreshold, fewest_changes, importance_under_refits, linear_contributions,
                      median_case, shap_by_feature, shuffle_labels, top_k_vs_random_k)
@@ -151,6 +152,55 @@ def test_a_ranking_that_puts_noise_first_does_not_pass_the_same_check():
     drop, random_drops = top_k_vs_random_k(model, X_test, y_test, bad_ranking, k=2)
 
     assert drop <= np.quantile(random_drops, RANDOM_QUANTILE)
+
+
+def test_single_feature_reference_covers_every_variable_once():
+    X, y = make_signal_data()
+    model = small_xgb().fit(X.iloc[:800], y.iloc[:800])
+
+    _, reference = top_k_vs_random_k(
+        model, X.iloc[800:], y.iloc[800:], list(X.columns), k=1, n_random=2
+    )
+
+    assert len(reference) == X.shape[1]  # enumerate all six choices, even with a smaller sampling budget
+
+
+def test_small_reference_enumerates_every_pair():
+    X, y = make_signal_data()
+    model = small_xgb().fit(X.iloc[:800], y.iloc[:800])
+
+    _, reference = top_k_vs_random_k(
+        model, X.iloc[800:], y.iloc[800:], list(X.columns), k=2, n_random=30
+    )
+
+    assert len(reference) == 15  # six choose two; repeated subsets must not distort their weights
+
+
+def test_top_subset_uses_the_same_permutations_as_its_reference_entry():
+    X, y = make_signal_data()
+    model = small_xgb().fit(X.iloc[:800], y.iloc[:800])
+
+    top, reference = top_k_vs_random_k(
+        model, X.iloc[800:], y.iloc[800:], list(X.columns), k=1, n_repeats=3
+    )
+
+    assert top in reference  # one subset cannot receive two different scores in the same comparison
+
+
+def test_sampled_reference_uses_unique_seeded_subsets():
+    X, y = make_signal_data()
+    model = small_xgb().fit(X.iloc[:800], y.iloc[:800])
+
+    reference = xai_module.reference_auc_drops(
+        model, X.iloc[800:], y.iloc[800:], list(X.columns), k=3, n_random=7, n_repeats=2
+    )
+    reordered = xai_module.reference_auc_drops(
+        model, X.iloc[800:], y.iloc[800:], list(reversed(X.columns)), k=3, n_random=7, n_repeats=2
+    )
+
+    assert len(reference) == 7
+    assert all(len(set(subset)) == 3 for subset in reference)
+    assert reference == reordered
 
 
 def test_shuffling_noise_costs_nothing_and_shuffling_signal_costs_a_lot_on_unseen_data():
