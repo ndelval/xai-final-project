@@ -46,12 +46,9 @@ and identify potentially misleading recommendations. A second
 stakeholder, the model auditor, needs to assess whether the predictions
 depend on sensible signals and whether the explanations deserve trust.
 
-Evaluation of explanations matters: one published churn case study
-explicitly reports that it did not evaluate them \cite{cao2021}, while another
-reports bootstrap stability \cite{elattar2026}. Counterfactual churn analyses also
-motivate examining alternative customer profiles \cite{oprea2025}. Here we train
-and evaluate a model, compare explanations, test their sensitivity and
-use them to simplify the model and examine retention levers. The central
+Here I train and evaluate a model, compare explanations, test their
+sensitivity and use them to simplify the model and examine retention
+levers. The central
 distinction is between explaining a prediction and establishing what
 would actually retain a customer.
 
@@ -59,7 +56,7 @@ would actually retain a customer.
 
 \subsection{Task and data}\label{task-and-data}
 
-We classify the binary \texttt{Churn} label from a customer's
+I classify the binary \texttt{Churn} label from a customer's
 demographics, tenure, subscribed services, contract and billing profile.
 The public IBM Telco Customer Churn sample \cite{ibm} contains 7,043
 customers and 21 columns, with 26.5 \% churn. Dropping
@@ -70,29 +67,29 @@ columns. \texttt{SeniorCitizen} is a binary indicator, not continuous
 age. Observed churn is 42.7 \% for month-to-month, 11.3 \% for one-year
 and 2.8 \% for two-year contracts.
 
-\texttt{TotalCharges} contains 11 blanks, all at zero tenure; we encode
+\texttt{TotalCharges} contains 11 blanks, all at zero tenure; I encode
 these not-yet-billed profiles as 0 and reject missing values at positive
 tenure. This row-wise rule learns nothing from other customers. One-hot
 encoding and numeric scaling for logistic regression are fitted inside
 each training fold's pipeline. There are 22 duplicate feature-target
-rows after removing the ID. We retain them because identical profiles
+rows after removing the ID. I retain them because identical profiles
 may represent different customers; their possible effect on evaluation
 optimism is unquantified.
 
 \subsection{Evaluation protocol and
 models}\label{evaluation-protocol-and-models}
 
-We use a stratified 80/20 split with seed 42: 5,634 training and 1,409
+I use a stratified 80/20 split with seed 42: 5,634 training and 1,409
 test customers. Five-fold inner CV selects hyperparameters on training
 only; the reported CV estimate repeats the search within five outer
-folds. We compare a constant-prior majority baseline, L2 logistic
+folds. I compare a constant-prior majority baseline, L2 logistic
 regression (tuned \texttt{C}) and XGBoost (tuned depth and number of
 trees). All fitted preprocessing is inside the pipelines. A
-train-minus-CV AUC gap below 0.03 is our operational overfitting
+train-minus-CV AUC gap below 0.03 is my operational overfitting
 diagnostic, not a universal guarantee of generalisation.
 
 \textbf{Exploratory status.} The initial models are fitted and tuned
-without test data. We subsequently inspect test explanations before
+without test data. I subsequently inspect test explanations before
 finalising the simplification hypothesis. Redundancy checks and
 numerical variant selection use training data, but the later test
 comparison is descriptive, not an untouched confirmatory evaluation.
@@ -100,7 +97,7 @@ Rechecking training evidence does not undo earlier test inspection.
 Confirmation of the complete revised procedure requires an independent
 cohort.
 
-We report churn-class precision, recall, F1 and average precision
+I report churn-class precision, recall, F1 and average precision
 (called PR-AUC here), ROC-AUC and Brier score. No resampling or class
 weighting is used. A missed churner is assumed to cost \emph{r} times a
 wasted offer, with \emph{r} = 5 as in \cite{elattar2026}, and sensitivity at 2 and
@@ -126,25 +123,25 @@ at most 0.068 log-odds from the full-training reference. Global
 importance is mean absolute contribution; local values explain one
 customer's score. Permutation importance \cite{fisher2019} measures the drop in
 ROC-AUC after shuffling an original feature. Logistic contributions are
-coefficient times deviation from the average training customer. We
+coefficient times deviation from the average training customer. I
 compare ranks across methods because AUC loss and log-odds have
 different units.
 
-We adapt the label-randomisation idea of Adebayo et al.~\cite{adebayo2018} to
+I adapt the label-randomisation idea of Adebayo et al.~\cite{adebayo2018} to
 tabular SHAP. Ten shuffled-label refits should have mean Spearman
 correlation below 0.5 with the real importance ranking; ten bootstrap
 refits retaining labels are the control. For deletion, training-derived
 top-k rankings should produce an AUC loss above the 95th percentile of
 reference k-feature subsets for each k = 1, 2, 3. These are diagnostic
 criteria, not calibrated significance tests. After the exploratory audit
-we strengthen the reference while retaining these criteria: enumerate
+I strengthen the reference while retaining these criteria: enumerate
 every singleton (50 permutations) and pair (10), and sample 200 distinct
 triples without replacement (10). All rankings share the reference, and
 an identical subset reuses its score. Reversed SHAP is a negative
 control. The adopted model receives the same checks.
 
 DiCE \cite{mothilal2020} proposes local profiles that cross the decision threshold.
-We freeze non-actionable attributes, restrict possible changes to
+I freeze non-actionable attributes, restrict possible changes to
 billing, add-ons and contracts, and compare the proposals with
 exhaustive search over the permitted combinations. A wrapper maps the
 operating boundary to DiCE's 0.5 boundary; reported probabilities come
@@ -156,11 +153,11 @@ cost or proof that a customer would accept the changes.
 \subsection{Model performance and
 decisions}\label{model-performance-and-decisions}
 
-Table~\ref{tab:discrimination} shows small train-CV gaps, below our operational limit, and test
+Table~\ref{tab:discrimination} shows small train-CV gaps, below my operational limit, and test
 performance close to CV. This supports limited overfitting under the
 evaluated protocol. XGBoost's mean CV AUC is numerically higher, but
 comparing separate fold standard deviations is not a paired significance
-test; we infer neither superiority nor equivalence from them. The
+test; I infer neither superiority nor equivalence from them. The
 selected XGBoost has depth 1 and 600 trees: an additive model, best
 within the tested grid rather than proof that interactions never matter.
 
@@ -329,7 +326,7 @@ model}\label{simplification-and-validation-of-the-adopted-model}
 
 The explanations motivate removing MonthlyCharges and TotalCharges;
 training CV reconstruction \(R^2\) is 0.999 for each (the latter from tenure,
-monthly price and their product). We compare the original, either
+monthly price and their product). I compare the original, either
 removal and both removals using the same nested training folds. The
 retained practical rule adopts the smallest version whose mean AUC loss
 is at most 0.003 and mean error-cost increase at most 0.005. Both
@@ -363,7 +360,7 @@ the selected tolerances. Test cost rises slightly. Stability rises from
 establish an improvement. Attribution is reallocated: removing redundant
 price variables changes which remaining features receive credit.
 
-We now test the adopted model's explanations, without using the verdicts
+I now test the adopted model's explanations, without using the verdicts
 to choose another variant. Label-shuffle mean Spearman is 0.354 versus
 0.932 for ten bootstrap controls. Table~\ref{tab:checks} uses the same strengthened
 deletion protocol, with 17 singletons, 136 pairs and 200 distinct
@@ -468,7 +465,7 @@ only, but the simplification follows inspection of test explanations and
 its test comparison remains exploratory. No temporal split, future
 lead-time validation or drift assessment is possible without dates. A
 telecom study's AUC fell from 93.3 \% to 89 \% on later customers
-\cite{ahmad2019}, motivating periodic re-evaluation. We have not measured
+\cite{ahmad2019}, motivating periodic re-evaluation. I have not measured
 fairness across groups, despite demographic variables and possible
 proxies. Independent prospective data, subgroup checks, offer acceptance
 and causal uplift are needed before operational use.
@@ -477,11 +474,6 @@ and causal uplift are needed before operational use.
 \clearpage
 \begin{thebibliography}{99}
 \small\raggedright
-\bibitem{cao2021}
-N. Cao, ``Explainable Artificial Intelligence for Customer Churning
-  Prediction in Banking,'' \emph{Proc. 2nd Int. Conf. on Human-centered
-  Artificial Intelligence (Computing4Human 2021)}, CEUR-WS, 2021.
-
 \bibitem{elattar2026}
 A. El Attar and M. El-Hajj, ``Explainable AI-driven customer churn
   prediction: a multi-model ensemble approach with SHAP-based feature
@@ -491,12 +483,6 @@ A. El Attar and M. El-Hajj, ``Explainable AI-driven customer churn
 \bibitem{ibm}
 IBM, ``Telco Customer Churn'' sample data set,
   \url{https://raw.githubusercontent.com/IBM/telco-customer-churn-on-icp4d/master/data/Telco-Customer-Churn.csv}.
-
-\bibitem{oprea2025}
-S.-V. Oprea and A. Bâra, ``Customer-Centric Decision-Making with XAI
-  and Counterfactual Explanations for Churn Mitigation,'' \emph{J.
-  Theor. Appl. Electron. Commer. Res.}, vol.~20, no. 2, art. 129, 2025.
-  doi:10.3390/jtaer20020129.
 
 \bibitem{lundberg2017}
 S. M. Lundberg and S.-I. Lee, ``A Unified Approach to Interpreting
